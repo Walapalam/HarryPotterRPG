@@ -17,6 +17,13 @@ class Character:
         self.health = max_health
         self.mana = max_mana
         self.known_spells: List[Spell] = []
+        
+        # Status effects
+        self.shield_active = False
+        self.is_stunned = False
+        self.is_disarmed = False
+        self.is_knocked_back = False
+        self.status_effects = []  # List of active effects
     
     def is_alive(self) -> bool:
         """Check if the character is still alive."""
@@ -33,6 +40,49 @@ class Character:
     def restore_mana(self, amount: int) -> None:
         """Restore mana, not exceeding max mana."""
         self.mana = min(self.max_mana, self.mana + amount)
+    
+    def apply_effect(self, effect: str) -> None:
+        """Apply a status effect to the character."""
+        if effect == "shield":
+            self.shield_active = True
+            self.status_effects.append("Shield")
+        elif effect == "stun":
+            self.is_stunned = True
+            self.status_effects.append("Stunned")
+        elif effect == "disarm":
+            self.is_disarmed = True
+            self.status_effects.append("Disarmed")
+        elif effect == "knockback":
+            self.is_knocked_back = True
+            self.status_effects.append("Knocked Back")
+    
+    def clear_effects(self) -> None:
+        """Clear all status effects."""
+        self.shield_active = False
+        self.is_stunned = False
+        self.is_disarmed = False
+        self.is_knocked_back = False
+        self.status_effects.clear()
+    
+    def get_status_effects(self) -> List[str]:
+        """Get list of active status effects."""
+        return self.status_effects
+    
+    def take_damage(self, amount: int) -> int:
+        """
+        Take damage, considering shield effect.
+        Returns the actual damage taken.
+        """
+        if self.shield_active:
+            # Shield reduces damage by 50%
+            actual_damage = amount // 2
+            self.shield_active = False  # Shield breaks after use
+            self.status_effects.remove("Shield")
+        else:
+            actual_damage = amount
+            
+        self.health = max(0, self.health - actual_damage)
+        return actual_damage
 
 
 class NPC(Character):

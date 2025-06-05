@@ -2,9 +2,12 @@
 Unit tests for the Hogwarts RPG game.
 """
 import unittest
+import os
+import json
 from player import Player
 from spell import ALL_SPELLS, Spell
 from npcs import TRAINING_DUMMY
+from main import HogwartsRPG, SAVE_FILE
 
 class TestHogwartsRPG(unittest.TestCase):
     def setUp(self):
@@ -88,5 +91,100 @@ class TestHogwartsRPG(unittest.TestCase):
         self.assertEqual(damage, 0)
         self.assertEqual(self.player.mana, 10)  # Mana should not be deducted
 
-if __name__ == '__main__':
-    unittest.main()
+    def test_save_load_game(self):
+        """Test saving and loading game state."""
+        # Create a game instance with some state
+        game = HogwartsRPG()
+        game.player = self.player
+        game.player.learn_spell(ALL_SPELLS["lumos"])
+        game.player.health = 50
+        game.player.mana = 75
+        game.player.knowledge = 100
+        game.player.house_points = 50
+        
+        # Save the game
+        game.save_game()
+        self.assertTrue(os.path.exists(SAVE_FILE))
+        
+        # Create a new game instance and load the save
+        new_game = HogwartsRPG()
+        self.assertTrue(new_game.load_game())
+        
+        # Verify loaded state matches original
+        self.assertEqual(new_game.player.name, self.player.name)
+        self.assertEqual(new_game.player.house, self.player.house)
+        self.assertEqual(new_game.player.health, 50)
+        self.assertEqual(new_game.player.mana, 75)
+        self.assertEqual(new_game.player.knowledge, 100)
+        self.assertEqual(new_game.player.house_points, 50)
+        self.assertEqual(len(new_game.player.known_spells), 1)
+        self.assertEqual(new_game.player.known_spells[0].name, "Lumos")
+        
+        # Clean up
+        os.remove(SAVE_FILE)
+        
+    def test_status_effects(self):
+        """Test status effect application and clearing."""
+        # Test shield effect
+        protego = ALL_SPELLS["protego"]
+        self.player.learn_spell(protego)
+        _, effect = protego.cast(self.player, self.player)
+        
+        self.assertEqual(effect, "shield")
+        self.assertTrue(self.player.shield_active)
+        self.assertIn("Shield", self.player.get_status_effects())
+        
+        # Test that shield reduces damage
+        initial_health = self.player.health
+        dummy = TRAINING_DUMMY
+        stupefy = ALL_SPELLS["stupefy"]
+        damage = 20  # Stupefy's damage
+        actual_damage = self.player.take_damage(damage)
+        
+        self.assertEqual(actual_damage, damage // 2)  # Shield should halve damage
+        self.assertEqual(self.player.health, initial_health - (damage // 2))
+        self.assertFalse(self.player.shield_active)  # Shield should break after use
+        
+        # Test stun effect
+        self.player.learn_spell(stupefy)
+        _, effect = stupefy.cast(self.player, dummy)
+        
+        self.assertEqual(effect, "stun")
+        self.assertIn("Stunned", dummy.get_status_effects())
+        
+        # Test that stunned characters can't cast spells
+        _, effect = stupefy.cast(dummy, self.player)
+        self.assertEqual(effect, "Cannot cast while stunned!")
+        
+        # Test clearing effects
+        dummy.clear_effects()
+        self.assertEqual(len(dummy.get_status_effects()), 0)
+        self.assertFalse(dummy.is_stunned)
+    
+    def test_mana_management(self):
+        """Test mana consumption and replenishment."""
+        initial_mana = self.player.mana
+        
+        # Test mana consumption
+        stupefy = ALL_SPELLS["stupefy"]
+        self.player.learn_spell(stupefy)
+        stupefy.cast(self.player, TRAINING_DUMMY)
+        
+        self.assertEqual(self.player.mana, initial_mana - stupefy.mana_cost)
+        
+        # Test mana replenishment
+        replenish_amount = 30
+        self.player.restore_mana(replenish_amount)
+        expected_mana = min(self.player.max_mana, initial_mana - stupefy.mana_cost + replenish_amount)
+        
+        self.assertEqual(self.player.mana, expected_mana)
+        
+        # Test mana cap at max_mana
+        self.player.restore_mana(1000)
+        self.assertEqual(self.player.mana, self.player.max_mana)
+        
+        # Test casting with insufficient mana
+        self.player.mana = 5  # Set to very low value
+        _, effect = stupefy.cast(self.player, TRAINING_DUMMY)
+        self.assertEqual(effect, "Not enough mana!")
+        self.assertEqual(self.player.mana, 5)  # Mana shouldn't be deducted on failed cast

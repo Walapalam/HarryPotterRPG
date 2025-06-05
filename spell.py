@@ -43,7 +43,23 @@ class Spell:
         if caster.mana < self.mana_cost:
             return 0, "Not enough mana!"
         
+        if caster.is_stunned:
+            return 0, "Cannot cast while stunned!"
+            
+        if caster.is_disarmed and self.damage > 0:
+            return 0, "Cannot cast offensive spells while disarmed!"
+        
         caster.mana -= self.mana_cost
+        
+        # Apply effects
+        if self.effect and target:
+            target.apply_effect(self.effect)
+            
+            # Special handling for healing spells
+            if self.effect == "heal":
+                target.heal(30)  # Heal for a fixed amount
+                return 0, "healing"
+                
         return self.damage, self.effect
 
 

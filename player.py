@@ -64,5 +64,42 @@ class Player(Character):
             "Knowledge": self.knowledge,
             "House Points": self.house_points,
             "Known Spells": [spell.name for spell in self.known_spells],
-            "Inventory": self.inventory
+            "Inventory": self.inventory,
+            "Status Effects": self.get_status_effects()
         }
+        
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert player state to a dictionary for saving."""
+        return {
+            "name": self.name,
+            "house": self.house,
+            "health": self.health,
+            "max_health": self.max_health,
+            "mana": self.mana,
+            "max_mana": self.max_mana,
+            "knowledge": self.knowledge,
+            "house_points": self.house_points,
+            "inventory": self.inventory,
+            "known_spells": [spell.name for spell in self.known_spells]
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'Player':
+        """Create a player instance from saved data."""
+        from spell import ALL_SPELLS  # Import here to avoid circular imports
+        
+        player = cls(data["name"], data["house"])
+        player.health = data["health"]
+        player.max_health = data["max_health"]
+        player.mana = data["mana"]
+        player.max_mana = data["max_mana"]
+        player.knowledge = data["knowledge"]
+        player.house_points = data["house_points"]
+        player.inventory = data["inventory"]
+        
+        # Restore known spells
+        for spell_name in data["known_spells"]:
+            if spell_name in ALL_SPELLS:
+                player.known_spells.append(ALL_SPELLS[spell_name])
+                
+        return player
